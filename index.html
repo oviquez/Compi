@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <title>Editor</title>
+    <style type="text/css" media="screen">
+        #editor {
+            position: relative;
+            top: 0;
+            right: 0;
+            width: 800px;
+            height: 250px;
+            border: 2px solid black;
+        }
+    </style>
+
+</head>
+<body>
+
+<!-- Div content -->
+    <div id="editor">
+    //archivo de prueba GP
+    INT x;
+    x=13;
+    x = "Hola"
+    </div>
+
+    <div class="ace_status-indicator" style="display: inline-block;">
+        <label id="textPos"> 1:0 </label>
+    </div>
+
+    <br/>
+    <br/>
+
+    <div>
+      <button id="parse">Parse</button>
+    </div>
+
+    <br/>
+
+    <div>
+    <textarea id="messages"; rows="5" cols="100">...Parser Messages...</textarea>
+    </div>
+
+
+<script src="src-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+<script>
+    var editor = ace.edit("editor");
+    editor.setTheme("ace/theme/iplastic");
+    editor.session.setMode("ace/mode/c_cpp");
+
+    editor.getSession().selection.on('changeCursor', function(e) {
+        document.getElementById("textPos").innerText = editor.selection.getCursor().row+1 + ':' + editor.selection.getCursor().column;
+    });
+</script>
+
+<script src="lib/require.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/underscore.js/1.7.0/underscore-min.js"></script>
+<script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/typeahead.js/0.10.4/typeahead.bundle.min.js"></script>
+
+<script charset="utf-8">
+
+    var antlr4 = require('antlr4/index');
+    var Lgenerated = require('generated/GPLexer');
+    var Pgenerated = require('generated/GPParser');
+    var PPVisitor = require('./PrettyPrint');
+    var tree = null;
+
+    var ErrorListener = function(errors) {
+        antlr4.error.ErrorListener.call(this);
+        this.errors = errors;
+        return this;
+    };
+
+    ErrorListener.prototype = Object.create(antlr4.error.ErrorListener.prototype);
+    ErrorListener.prototype.constructor = ErrorListener;
+    ErrorListener.prototype.syntaxError = function(rec, sym, line, col, msg, e) {
+        this.errors.push("Error: "+ msg + " en "+line+":"+col);
+    };
+
+    var errors = [];
+    var listaTokens = [];
+
+    //click del botón para hacer parser
+    document.getElementById("parse").addEventListener("click", function() {
+        errors = [];
+        var input = editor.getValue();
+        var chars = new antlr4.InputStream(input);
+        var lexer = new Lgenerated.GPLexer(chars);
+
+
+        listaTokens = lexer.getAllTokens();
+
+        listaTokens.forEach(function(element) {
+            console.log(element.type + " : '" + element.text + "'");
+        });
+
+        lexer.reset();
+
+        var tokens = new antlr4.CommonTokenStream(lexer);
+        var parser = new Pgenerated.GPParser(tokens);
+
+        var msg = document.getElementById("messages");
+        var ppvisitor = new PPVisitor.PrettyPrint(msg);
+
+        parser.buildParseTrees = true;
+
+        var listener = new ErrorListener(errors);
+
+        lexer.removeErrorListeners();
+        lexer.addErrorListener(listener);
+
+        parser.removeErrorListeners();
+        parser.addErrorListener(listener);
+
+
+
+        tree = parser.program();
+
+        document.getElementById("messages").value='';
+        if (errors.length != 0)
+        {
+            errors.forEach(function(element) {
+                document.getElementById("messages").value += (element + '\n');
+            });
+        }
+        else {
+            document.getElementById("messages").value = 'Compilación Exitosa!!!\n\n';
+            ppvisitor.visit(tree);
+        }
+
+    });
+
+
+
+</script>
+
+</body>
+</html>
